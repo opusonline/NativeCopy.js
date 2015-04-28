@@ -13,6 +13,7 @@
 
     var _defaults = {
         copy: '',
+        beforeCopy: noop,
         afterCopy: noop,
         fallback: noop
     };
@@ -39,6 +40,7 @@
             } else if (objectIs(this.options.copy, 'Function')) {
                 value = this.options.copy();
             }
+            this.options.beforeCopy.call(this, value);
             status = window.clipboardData.setData('Text', value);
             this.options.afterCopy.call(this, status, value);
         };
@@ -70,6 +72,7 @@
                 } else if (objectIs(this.options.copy, 'Function')) {
                     value = this.options.copy();
                 }
+                this.options.beforeCopy.call(this, value);
                 _copyTextField.value = value;
                 _copyTextField.select();
                 enabled = document.queryCommandEnabled('copy');

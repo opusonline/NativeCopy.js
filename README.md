@@ -5,8 +5,8 @@ Javascript plugin to copy some text to the clipboard.
 
 This plugin supports:
 - callback for text generation
-- afterCopy callback
-- fallback if not supported by browser
+- beforeCopy/afterCopy callback
+- fallback callback if not supported by browser
 
 #Install
 
@@ -31,6 +31,9 @@ jQuery
 // native
 new NativeCopy('copyButton', { // copyButton is id of button element
     copy: 'This is great!',
+    beforeCopy: function (text) {
+        console.log(text);
+    },
     afterCopy: function (status, text) {
         console.log(status, text);
     },
@@ -43,6 +46,9 @@ new NativeCopy('copyButton', { // copyButton is id of button element
 // jQuery
 $('#copyButton').nativeCopy({
     copy: 'This is great!',
+    beforeCopy: function (text) {
+        console.log(text);
+    },
     afterCopy: function (status, text) {
         console.log(status, text);
     },
