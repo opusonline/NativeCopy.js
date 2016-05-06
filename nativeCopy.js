@@ -3,127 +3,158 @@
  * native copy to clipboard
  *
  * author: Stefan Benicke <stefan.benicke@gmail.com>
+ * version: 2.0.0
  */
-(function (global, undefined) {
+(function (global, window, document, undefined) {
     // http://updates.html5rocks.com/2015/04/cut-and-copy-commands
 
     var _copyTextField;
 
-    var initCopyField, onClickCopy, cleanup;
-
     var _defaults = {
-        copy: '',
+        text: '',
         beforeCopy: noop,
-        afterCopy: noop,
-        fallback: noop
+        onSuccess: noop,
+        onError: noop
     };
 
-    function NativeCopy(elementID, options) {
+    function NativeCopy(selector, options) {
+        var clickHandler;
+        var button = document.querySelector(selector);
+        if (button === null) {
+            throw new TypeError('Invalid trigger element: ' + selector);
+        }
+        clickHandler = getHandler(this);
+        button.addEventListener('click', clickHandler, false);
         this.options = extend({}, _defaults, options);
-        this.button = document.getElementById(elementID);
-        this.handler = onClickCopy.bind(this);
-        this.button.addEventListener('click', this.handler);
+        this.button = button;
+        this.clickHandler = clickHandler;
     }
 
-    NativeCopy.supported = undefined;
+    NativeCopy.prototype.clearSelection = function () {
+        removeCopyTextField();
+        return this;
+    };
 
-    if ('clipboardData' in window && objectIs(window.clipboardData, 'DataTransfer')) {
-        // using IE clipboardData because document.execCommand('copy') always returns true
-        // even if user denies clipboard access! setData however is trust-able.
+    NativeCopy.prototype.destroy = function () {
+        removeCopyTextField();
+        if (this.button && this.clickHandler) {
+            this.button.removeEventListener('click', this.clickHandler, false);
+            this.button = undefined;
+            this.clickHandler = undefined;
+        }
+        return this;
+    };
 
-        NativeCopy.supported = true;
+    global['NativeCopy'] = NativeCopy;
 
-        onClickCopy = function onClickCopy() {
-            var status, value = '';
-            if (objectIs(this.options.copy, 'String')) {
-                value = this.options.copy;
-            } else if (objectIs(this.options.copy, 'Function')) {
-                value = this.options.copy();
-            }
-            this.options.beforeCopy.call(this, value);
-            status = window.clipboardData.setData('Text', value);
-            this.options.afterCopy.call(this, status, value);
-        };
-
-    } else {
-
-        initCopyField = function initCopyField() {
-            if (typeof _copyTextField !== 'undefined') {
-                return;
-            }
-            _copyTextField = document.createElement('textarea');
-            document.body.appendChild(_copyTextField);
-            _copyTextField.style.position = 'absolute';
-            _copyTextField.style.top = '0';
-            _copyTextField.style.left = '-9999px';
-
-            NativeCopy.supported = document.queryCommandSupported('copy');
-            if (NativeCopy.supported === false) {
-                throw new Error('not supported');
-            }
-        };
-
-        onClickCopy = function onClickCopy() {
-            var enabled, status, value = '';
-            try {
-                initCopyField.call(this);
-                if (objectIs(this.options.copy, 'String')) {
-                    value = this.options.copy;
-                } else if (objectIs(this.options.copy, 'Function')) {
-                    value = this.options.copy();
-                }
-                this.options.beforeCopy.call(this, value);
-                _copyTextField.value = value;
-                _copyTextField.select();
-                enabled = document.queryCommandEnabled('copy');
-                if (enabled === false) {
-                    this.options.afterCopy.call(this, false, value);
-                    return;
-                }
-                status = document.execCommand('copy');
-                this.options.afterCopy.call(this, status, value);
-            } catch (exception) {
-                cleanup.call(this);
-                this.options.fallback.call(this.button);
-            }
-        };
-
-        cleanup = function cleanup() {
-            if (typeof _copyTextField !== 'undefined') {
-                _copyTextField = null;
-            }
-            this.button.removeEventListener('click', this.handler);
-        };
-
-        // https://code.google.com/p/chromium/issues/detail?id=476508
-        if (document.queryCommandSupported('copy') === true) {
-            NativeCopy.supported = true;
+    function getHandler(instance) {
+        return function () {
+            (('clipboardData' in window && objectIs(window.clipboardData, 'DataTransfer')) ? onClickCopyIE : onClickCopy).call(instance);
         }
     }
 
-    global['NativeCopy'] = NativeCopy;
+    function initCopyField() {
+        var isRTL, style;
+        if (_copyTextField) {
+            _copyTextField.style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
+            return;
+        }
+        isRTL = document.documentElement.getAttribute('dir') === 'rtl';
+        _copyTextField = document.createElement('textarea');
+        _copyTextField.setAttribute('readonly', '');
+        style = _copyTextField.style;
+        // Prevent zooming on iOS (seen on https://github.com/zenorocha/clipboard.js/blob/master/dist/clipboard.js#L456)
+        style.fontSize = '12pt';
+        style.border = '0';
+        style.padding = '0';
+        style.margin = '0';
+        style.position = 'fixed';
+        style[isRTL ? 'right' : 'left'] = '-9999px';
+        style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
+        document.body.appendChild(_copyTextField);
+    }
+
+    function removeCopyTextField() {
+        if (_copyTextField) {
+            _copyTextField.blur();
+            document.body.removeChild(_copyTextField);
+            _copyTextField = undefined;
+        }
+    }
+
+    function onClickCopy() {
+        var status;
+        var value = getText(this);
+        var options = this.options;
+        if (options.beforeCopy.call(this, value) === false) {
+            return;
+        }
+        setTextToField(value);
+        try {
+            status = document.execCommand('copy');
+        } catch (exception) {
+            status = false;
+        }
+        options[status ? 'onSuccess' : 'onError'].call(this, value);
+    }
+
+    function onClickCopyIE() {
+        // if ('clipboardData' in window && objectIs(window.clipboardData, 'DataTransfer'))
+        // using IE clipboardData because document.execCommand('copy') always returns true
+        // even if user denies clipboard access! setData however is trust-able.
+        var status;
+        var value = getText(this);
+        var options = this.options;
+        if (options.beforeCopy.call(this, value) === false) {
+            return;
+        }
+        status = window.clipboardData.setData('Text', value);
+        if (status === false) {
+            // fallback to init textarea, show message "press ctrl-C"
+            setTextToField(value);
+        }
+        options[status ? 'onSuccess' : 'onError'].call(this, value);
+    }
+
+    function setTextToField(value) {
+        initCopyField();
+        _copyTextField.value = value;
+        _copyTextField.focus();
+        _copyTextField.select();
+    }
+
+    function getText(instance) {
+        var text = instance.options.text;
+        if (objectIs(text, 'String')) {
+            return text;
+        } else if (objectIs(text, 'Function')) {
+            return text.call(this);
+        }
+        return '';
+    }
 
     function objectIs(myObject, type) {
         return Object.prototype.toString.call(myObject) === '[object ' + type + ']';
     }
 
     function extend(destination) {
-        var i, n, k;
-        var sources = Array.prototype.slice.call(arguments, 1);
-        for (i = 0, n = sources.length; i < n; ++i) {
-            if (typeof sources[i] !== 'object' || sources[i] === null) {
+        var i, n, source, k;
+        var target = Object(destination);
+        for (i = 1, n = arguments.length; i < n; ++i) {
+            source = arguments[i];
+            if (typeof source !== 'object' || source === null) {
                 continue;
             }
-            for (k in sources[i]) {
-                if (sources[i].hasOwnProperty(k)) {
-                    destination[k] = sources[i][k];
+            for (k in source) {
+                if (source.hasOwnProperty(k)) {
+                    target[k] = source[k];
                 }
             }
         }
-        return destination;
+        return target;
     }
 
     function noop() {
     }
 
-})(this);
+})(this, window, document);

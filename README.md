@@ -5,22 +5,13 @@ Javascript plugin to copy some text to the clipboard.
 
 This plugin supports:
 - callback for text generation
-- beforeCopy/afterCopy callback
-- fallback callback if not supported by browser
+- `beforeCopy`/`onSuccess`/`onError` callbacks
+- `destroy()` method
 
 #Install
 
-Native Javascript
-
 ```html
-<script src="NativeCopy.js"></script>
-```
-
-jQuery
-
-```html
-<script src="jquery.js"></script>
-<script src="nativeCopy.jquery.js"></script>
+<script src="nativeCopy.js"></script>
 ```
 
 #Usage
@@ -28,33 +19,24 @@ jQuery
 ###Example
 
 ```javascript
-// native
-new NativeCopy('copyButton', { // copyButton is id of button element
-    copy: 'This is great!',
+var nativecopy = new NativeCopy('#copyButton', { // copyButton is id of button element, could be any selector for example '.cpBtn'
+    text: function() { // or just text: 'This is great!',
+        return 'This is great!';
+    },
     beforeCopy: function (text) {
         console.log(text);
+        // you can do return false; to prevent continuing
     },
-    afterCopy: function (status, text) {
-        console.log(status, text);
+    onSuccess: function (text) {
+        console.log('success', text);
+        this.clearSelection();
     },
-    fallback: function () {
-        var button = this;
-        useDifferentPlugin(button);
+    onError: function (text) {
+        console.log('error', text);
+        alert('Press Ctrl-C to copy');
     }
 });
 
-// jQuery
-$('#copyButton').nativeCopy({
-    copy: 'This is great!',
-    beforeCopy: function (text) {
-        console.log(text);
-    },
-    afterCopy: function (status, text) {
-        console.log(status, text);
-    },
-    fallback: function () {
-        var button = this;
-        useDifferentPlugin(button);
-    }
-});
+// later
+nativecopy.destroy();
 ```
