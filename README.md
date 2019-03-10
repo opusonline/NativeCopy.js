@@ -8,15 +8,15 @@ This plugin supports:
 - `beforeCopy`/`onSuccess`/`onError` callbacks
 - `destroy()` method
 
-#Install
+# Install
 
 ```html
 <script src="nativeCopy.js"></script>
 ```
 
-#Usage
+# Usage
 
-###Example
+### Example
 
 ```javascript
 var nativecopy = new NativeCopy('#copyButton', { // copyButton is id of button element, could be any selector for example '.cpBtn'
