@@ -7,8 +7,11 @@ This plugin supports:
 - callback for text generation
 - `beforeCopy`/`onSuccess`/`onError` callbacks
 - `destroy()` method
+- new in v2.1.0 [Async Clipboard API](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API)
 
 # Install
+
+Install with [yarn](https://yarnpkg.com/): `yarn add opusonline-nativecopy.js`
 
 ```html
 <script src="nativeCopy.js"></script>
