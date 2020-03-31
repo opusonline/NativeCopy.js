@@ -1,0 +1,18 @@
+{
+  "name": "opusonline-nativecopy.js",
+  "version": "2.1.0",
+  "author": "Stefan Benicke <stefan.benicke@gmail.com>",
+  "description": "Javascript plugin to copy some text to the clipboard.",
+  "main": "nativeCopy.js",
+  "keywords": [
+    "clipboard",
+    "copy",
+    "javascript",
+    "opusonline"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:opusonline/NativeCopy.js.git"
+  },
+  "license": "MIT"
+}
