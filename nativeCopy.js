@@ -3,7 +3,7 @@
  * native copy to clipboard
  *
  * author: Stefan Benicke <stefan.benicke@gmail.com>
- * version: 2.0.0
+ * version: 2.1.0
  */
 (function (global, window, document, undefined) {
     // http://updates.html5rocks.com/2015/04/cut-and-copy-commands
@@ -11,23 +11,27 @@
     var _copyTextField;
 
     var _defaults = {
-        text: '',
-        beforeCopy: noop,
-        onSuccess: noop,
-        onError: noop
+        'text': '',
+        'beforeCopy': noop,
+        'onSuccess': noop,
+        'onError': noop
     };
+
+    var _isIE = ('clipboardData' in window && objectIs(window.clipboardData, 'DataTransfer'));
+    var _asyncClipboard = ('clipboard' in navigator && objectIs(navigator.clipboard, 'Clipboard') && typeof navigator.clipboard.writeText === 'function');
 
     function NativeCopy(selector, options) {
         var clickHandler;
+        var self = this;
         var button = document.querySelector(selector);
         if (button === null) {
             throw new TypeError('Invalid trigger element: ' + selector);
         }
-        clickHandler = getHandler(this);
+        clickHandler = getHandler(self);
         button.addEventListener('click', clickHandler, false);
-        this.options = extend({}, _defaults, options);
-        this.button = button;
-        this.clickHandler = clickHandler;
+        self.options = extend({}, _defaults, options);
+        self.button = button;
+        self.clickHandler = clickHandler;
     }
 
     NativeCopy.prototype.clearSelection = function () {
@@ -36,20 +40,21 @@
     };
 
     NativeCopy.prototype.destroy = function () {
+        var self = this;
         removeCopyTextField();
-        if (this.button && this.clickHandler) {
-            this.button.removeEventListener('click', this.clickHandler, false);
-            this.button = undefined;
-            this.clickHandler = undefined;
+        if (self.button && self.clickHandler) {
+            self.button.removeEventListener('click', self.clickHandler, false);
+            self.button = undefined;
+            self.clickHandler = undefined;
         }
-        return this;
+        return self;
     };
 
     global['NativeCopy'] = NativeCopy;
 
     function getHandler(instance) {
         return function () {
-            (('clipboardData' in window && objectIs(window.clipboardData, 'DataTransfer')) ? onClickCopyIE : onClickCopy).call(instance);
+            (_isIE ? onClickCopyIE : onClickCopy).call(instance);   
         }
     }
 
@@ -84,10 +89,20 @@
 
     function onClickCopy() {
         var status;
-        var value = getText(this);
-        var options = this.options;
-        if (options.beforeCopy.call(this, value) === false) {
+        var self = this;
+        var value = getText(self);
+        var options = self.options;
+        if (options.beforeCopy.call(self, value) === false) {
             return;
+        }
+        if (_asyncClipboard) {
+            return navigator.clipboard.writeText(value)
+                .then(function() {
+                    options.onSuccess.call(self, value);
+                }, function() {
+                    setTextToField(value);
+                    options.onError.call(self, value);
+                });
         }
         setTextToField(value);
         try {
@@ -95,7 +110,7 @@
         } catch (exception) {
             status = false;
         }
-        options[status ? 'onSuccess' : 'onError'].call(this, value);
+        options[status ? 'onSuccess' : 'onError'].call(self, value);
     }
 
     function onClickCopyIE() {
@@ -103,9 +118,10 @@
         // using IE clipboardData because document.execCommand('copy') always returns true
         // even if user denies clipboard access! setData however is trust-able.
         var status;
-        var value = getText(this);
-        var options = this.options;
-        if (options.beforeCopy.call(this, value) === false) {
+        var self = this;
+        var value = getText(self);
+        var options = self.options;
+        if (options.beforeCopy.call(self, value) === false) {
             return;
         }
         status = window.clipboardData.setData('Text', value);
@@ -113,7 +129,7 @@
             // fallback to init textarea, show message "press ctrl-C"
             setTextToField(value);
         }
-        options[status ? 'onSuccess' : 'onError'].call(this, value);
+        options[status ? 'onSuccess' : 'onError'].call(self, value);
     }
 
     function setTextToField(value) {
